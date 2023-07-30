@@ -11,9 +11,6 @@ Fit mapping based on the full brain target set --> 1) Obtain training fit, 2) St
 The weights are stored using the result_identifier from fit_mapping.py.
 """
 
-# in an array of string, find index of 'lang_LH_netw' in dfold['neuroid_order'] (array)
-idx =
-
 def main(raw_args=None):
 	parser = argparse.ArgumentParser(description='')
 	# ANN (source) specific
