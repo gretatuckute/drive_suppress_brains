@@ -627,3 +627,67 @@ def format_source_layer(source_model: str,
 
 	print(f'Using source layer {source_layer} (type {type(source_layer)}) for {source_model} model')
 	return source_layer
+
+
+def NSD_noiseceiling(data: np.ndarray,
+					 NC_n: int = None):
+	"""
+	Compute the noise ceiling as in Allen et al., 2021 (NSD), but instead of assuming variance of the data = 1,
+	compute the actual "data" variance.
+
+	Args
+		data (np.ndarray): (n_items, n_UIDs)
+		NC_n (int): The n (normalization in the noise ceiling computation (NC = (ncsnr^2 / (ncsnr^2 + 1/NC_n))
+
+	Returns
+		noiseceiling (float): noise ceiling in Pearson correlation units
+		ncsnr (float): noise ceiling SNR
+		sd_signal (float): standard deviation of the signal
+		sd_noise (float): standard deviation of the noise
+
+	"""
+	n_UIDs = data.shape[1]
+
+	if NC_n is None:
+		NC_n = n_UIDs # If a manual NC_n is not specified, use the number of UIDs ("trials")
+
+	### 1. Estimation of the noise standard deviation (sd_noise) ###
+
+	# First compute std across "trials" (participants) and square it
+	std_across_trials_sq = np.square(
+		np.nanstd(data, axis=1, ddof=1))  # (n_items,) std: estimating the population standard deviation (across the population of people-trials)
+
+	# Mean across items (sentences)
+	mean_across_stimuli = np.nanmean(std_across_trials_sq)  # (1,) # OBS: If we run *two* participants, and one of them has just a single nan,
+																# then the std_across_trials_sq will be nan, and the mean_across_stimuli will be nan as well.
+
+	# Obtain sd (take sqrt)
+	sd_noise = np.sqrt(mean_across_stimuli)  # (1,)
+	if sd_noise == 0: # if there is no variance across trials
+		print(f'WARNING: sd_noise is {sd_noise} == 0')
+
+	### 2. Estimation of the signal standard deviation (sd_signal) ###
+	# Take mean across trials (participants)
+	mean_across_trials = np.nanmean(data, axis=1)  # (n_items,)
+
+	# Take variance across items (sentences)
+	var_across_stimuli = np.var(mean_across_trials, ddof=1)  # (1,) # std: population across "items"
+
+	sd_signal_temp = var_across_stimuli - (np.square(sd_noise) / n_UIDs) # pre sqrt. the n is how many "trials" we used to compute sd_noise
+	if sd_signal_temp < 0:
+		print(f'WARNING: sd_signal_temp is {sd_signal_temp} < 0')
+		sd_signal_temp = 0
+
+	sd_signal = np.sqrt(sd_signal_temp)  # (1,) #
+
+	### 3. Estimation of signal-to-noise and noise ceiling ###
+	# Noise ceiling SNR
+	ncsnr = sd_signal / sd_noise
+
+	# Fraction variance noise ceiling
+	noiseceiling_temp = np.square(ncsnr) / (np.square(ncsnr) + (1 / NC_n))
+
+	# convert to Pearson correlation units
+	noiseceiling = np.sqrt(noiseceiling_temp)
+
+	return noiseceiling, ncsnr, sd_signal, sd_noise
