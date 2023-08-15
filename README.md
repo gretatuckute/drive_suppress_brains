@@ -10,6 +10,49 @@ The environment is a Python 3.8.11 environment that makes heavy use of [pandas](
 conda env create -f env_drive-suppress-brains.yml
 ```
 
+## Repository organization
+ * [data](./data)
+ * [env](./env)
+ * [model-actv](./model-actv)
+   * [gpt2-xl](./model-actv/gpt2-xl)
+     * [last-tok](./model-actv/gpt2-xl/last-tok)
+ * [regr-weights](./regr-weights)
+   * [fit_mapping](./regr-weights/fit_mapping)
+     * [last-tok](./regr-weights/fit_mapping/last-tok)
+ * [results](./results)
+ * [src](./src)
+   * [plot_data](./src/plot_data)
+   * [run_analyses](./src/run_analyses)
+   * [statistics](./src/statistics)
+ * [README.md](./README.md)
+
+
+The `data` folder contains a csv file with the event-related data (_brain-lang-data_participant_20230728.csv_; main experiment) as well as a csv file for the blocked experiment (_brain-lang-blocked-data_participant_20230728.csv_).
+
+The `env` folder contains the conda yml file _env_drive-suppress-brains.yml_.
+
+The `model-actv` folder has pre-computed model activations for GPT2-XL (last-token representation). The file _beta-control-neural-T_actv.pkl_ contains the activations in a Pandas dataframe. The rows correspond to sentences, and the columns are multi-indexed according to layer and unit. The first level is layer (49 layers in GPT2-XL) and the second level is unit (1600 units in each representation vector in GPT2-XL). The file _beta-control-neural-T_stim.pkl_ contains the corresponding stimuli metadata in a Pandas dataframe. The two files are row-indexed using the same identifiers.
+
+The `regr-weights` folder has the encoding model regression weights in the `fit_mapping` subfolder with an additional subfolder according to the parameters that were used to fit the encoding model.
+
+The `results` folder will is the default folder for storing outputs from `src/run_analyses`.
+
+The `src` folder contains all code in the following subfolders: i) `plot_data` has a notebook that reproduces each of the main figures, ii) `run_analyses` has code to run all main analyses in the paper, and iii) `statistics` has R-based linear mixed effect (LME) statistics.
+
+## Brain and behavioral data
+The `data` folder contains a csv file with the event-related data (_brain-lang-data_participant_20230728.csv_; main experiment). This file contains brain responses for the left hemisphere (LH) language regions for n=10 participants (n=5 _train_ participants, n=5 _evaluation_ participants) along with various metadata and behavioral data for each sentence (n=10 linguistic properties). The `data` folder also contains a csv file with brain responses for the blocked experiment (_brain-lang-blocked-data_participant_20230728.csv_, n=4 _evaluation_ participants).
+Finally, the file _column_name_descriptions.csv_ contains descriptions of the content of each column in these csv files.
+
+## Analyzing data and generating plots
+The `src/plot_data` folder contains Jupyter Notebook that analyze and generate plots for the main results in the paper. 
+
+## Analyzing data and generating plots
+The `src/run_analyses` folder contains Python scripts to for running analyses. 
+
+The two main scripts are: 
+1. [/src/run_analyses/fit_mapping.py](https://github.com/gretatuckute/drive_suppress_brains/blob/main/src/run_analyses/fit_mapping.py) fits an encoding model from features from a source model (in this case, GPT2-XL, cahced in `model-actv/gpt2-xl`) to the participant-averaged brain data. The script will store outputs in `results` and the fitted regression weights in `regr-weights`.
+2. [/src/run_analyses/use_mapping_external.py](https://github.com/gretatuckute/drive_suppress_brains/blob/main/src/run_analyses/use_mapping_external.py) loads the regression weights from the encoding model and predicts each sentence in the supplied stimulus set.
+
 <!---
 
 ## XXXXX
@@ -43,5 +86,22 @@ The figures in the paper can be reproduced via the notebooks in the [analyze](ht
 	bdsk-url-1 = {https://www.biorxiv.org/content/early/2023/05/06/2023.04.16.537080},
 	bdsk-url-2 = {https://doi.org/10.1101/2023.04.16.537080}}
 ```
+
+`.
+├── data
+├── env
+├── model-actv
+│    └── gpt2-xl
+│          └── last-tok
+├── regr-weights
+│    └── fit_mapping
+│          └── last-tok
+├── results
+├── src
+│   ├── plot_data
+│   ├── run_analyses
+│   └── statistics
+└── README.md
+`
 
 --->
