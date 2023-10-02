@@ -173,9 +173,11 @@ d_axes_legend = {'CV_score_mean': 'Cross-validated predictivity (mean ± fold SE
 				 'surprisal-5gram_mean': 'Surprisal (5-gram)',
 				 'surprisal-5gram_raw_mean': 'Log probability (5-gram)',
 				 'surprisal-5gram_sum': 'Surprisal (5-gram, sum)',
+                  'log-prob-5gram_mean': 'Log probability (5-gram)',
 				'surprisal-pcfg_mean': 'Surprisal (PCFG)',
 				'surprisal-pcfg_raw_mean': 'Log probability (PCFG)',
 				'surprisal-pcfg_sum': 'Surprisal (PCFG, sum)',
+                  'log-prob-pcfg_mean': 'Log probability (PCFG)',
 				 'rating_arousal_mean': 'Arousal',
 				 'rating_conversational_mean': 'Conversational frequency',
 				 'rating_sense_mean': 'Plausibility',
@@ -296,7 +298,7 @@ def item_scatter_style(style_setting: str):
 		d_ylim = {'lang_LH_netw':
 					  {'None':
 						   {'797-841-880-837-856': None,
-							'797-841-880': [-2, 2],
+							'797-841-880': [-1.5, 1.5],
 							'837-856': [-2.4, 2.4],
 							'797': None,
 							'841': None,

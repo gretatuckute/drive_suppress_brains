@@ -1019,13 +1019,13 @@ def feat_scatter(df: pd.DataFrame,
         y = ffit(x)
         ax.plot(x, y, linewidth=4, linestyle='-', color='black', zorder=10)
         # Compute best fit line for cond = T
-        df_item_id_T = df_item_id[df_item_id['cond'] == 'T']
-        coefs_T = np.polynomial.polynomial.polyfit(df_item_id_T[x_val], df_item_id_T[y_val], 1)
-        ffit_T = np.polynomial.polynomial.Polynomial(coefs_T)
-        # Use same x_T as for all points
-        x_T = np.linspace(df_item_id[x_val].min(), df_item_id[x_val].max(), 100)
-        y_T = ffit_T(x_T)
-        ax.plot(x_T, y_T, linewidth=4, linestyle='--', color='black', zorder=10)
+        df_item_id_B = df_item_id[df_item_id['cond'] == 'B']
+        coefs_B = np.polynomial.polynomial.polyfit(df_item_id_B[x_val], df_item_id_B[y_val], 1)
+        ffit_B = np.polynomial.polynomial.Polynomial(coefs_B)
+        # Use same x_B as for all points
+        x_B = np.linspace(df_item_id[x_val].min(), df_item_id[x_val].max(), 100)
+        y_B = ffit_T(x_B)
+        ax.plot(x_B, y_B, linewidth=4, linestyle='--', color='black', zorder=10)
     # Make ticks and axis labels bigger
     plt.xticks(fontsize=30)
     plt.yticks(fontsize=30)
@@ -1047,7 +1047,7 @@ def feat_scatter(df: pd.DataFrame,
         plt.xlim(xlim)
     if ylim is not None:
         plt.ylim(ylim)
-    # Obtain r value for all values plotted, and for T, D, and B conds separately. Add numbers to plot
+    # Obtain r value for all values plotted, and for B, D, and S conds separately. Add numbers to plot
     r, p = pearsonr(df_item_id[x_val], df_item_id[y_val])
     r_B, p_B = pearsonr(df_item_id.loc[df_item_id['cond'] == 'B', x_val],
                         df_item_id.loc[df_item_id['cond'] == 'B', y_val])
@@ -1071,10 +1071,10 @@ def feat_scatter(df: pd.DataFrame,
     # Add all these outside of the plot NOT IN AXES
     # Outside of axes, add r and p values for each condition
     ax.text(0.79, 0.65, f'r={r:.2f}, p={p:.3}', transform=plt.gcf().transFigure, fontsize=10)
-    ax.text(0.79, 0.60, f'r_B={r_S:.2f}, p_B={p_S:.3}', transform=plt.gcf().transFigure, fontsize=10)
+    ax.text(0.79, 0.60, f'r_B={r_B:.2f}, p_B={p_B:.3}', transform=plt.gcf().transFigure, fontsize=10)
     # Plot these r values in the axes, lower right
     ax.text(0.25, 0.08, f'r (n=2,000) = {r:.2f}', transform=ax.transAxes, fontsize=18, )
-    ax.text(0.25, 0.02, f'r (n=1,000; grey) = {r_S:.2f}', transform=ax.transAxes, fontsize=18, )
+    ax.text(0.25, 0.02, f'r (n=1,000; grey) = {r_B:.2f}', transform=ax.transAxes, fontsize=18, )
     plt.tight_layout(pad=2)
     if save:
         savestr = shorten_savestr(savestr=savestr)
