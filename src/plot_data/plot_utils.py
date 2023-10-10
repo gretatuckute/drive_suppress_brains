@@ -1323,6 +1323,155 @@ def binned_feat(df: pd.DataFrame,
     return df_agg_feat
 
 
+def binned_feat_pairwise_stats(df: pd.DataFrame,
+                               x_val_feat: str,
+                               y_val: str = 'response_target',
+                               save: bool = False,
+                               base_savestr: str = '',
+                               add_savestr: str = '',
+                               min_trials: int = 20,  # 1%
+                               PLOTDIR: str = None,
+                               CSVDIR: str = None,
+                               ):
+    """
+    Run pairwise statistical tests between values (y_val) in bins (independent samples) of x_val_feat.
+    Note that running this statistics function requires statsmodels (not a part of the core drive-suppress env).
+
+    Args:
+        df (pd.DataFrame): DataFrame with colum {feat}_bin and response_target (rows are items, for this case,
+            the data is averaged across UIDs. df_item_id
+        x_val_feat (str): Name of feature.
+        y_val (str): Name of y-axis (response target)
+        save (bool): If True, then save plot
+        base_savestr (str): Base string to save plot
+        add_savestr (str): Additional string to save plot
+        min_trials (int): Minimum number of trials in a bin to plot. If less than this number, then the bin is not plotted (set to nan)
+        PLOTDIR (str): Directory to save plot
+        CSVDIR (str): Directory to save csv
+    """
+
+    from scipy.stats import ttest_ind
+    import itertools
+    from statsmodels.stats.multitest import multipletests
+
+    df_item_bins = df.copy(deep=True)
+
+    savestr = f'binned-feat_' \
+              f'X={x_val_feat}_Y={y_val}_' \
+              f'{base_savestr}{add_savestr}'
+
+    # Aggregate by bin
+    # Groupby feature value (the rating). We get the mean of response target (neural) for each rating value.
+    # Aggregate such that we get mean, median, std, sem, and count for each bin
+    df_agg_feat = df_item_bins.groupby(f'{x_val_feat}_bin').agg(
+        {y_val: ['mean', 'median', 'std', 'sem', 'count']})
+
+    # If min val is less than min_trials, then drop it
+    if df_agg_feat[y_val]["count"].min() < min_trials:
+        print(f'Number of bins with less than {min_trials} trials: {len(df_agg_feat.loc[df_agg_feat[y_val]["count"] < min_trials])}. '
+              f'Dropping these bins: {df_agg_feat.loc[df_agg_feat[y_val]["count"] < min_trials].index.values}')
+        df_agg_feat = df_agg_feat.loc[df_agg_feat[y_val]["count"] >= min_trials]
+
+    # Run the unique bin values
+    bins = df_agg_feat.index.values
+    # Get the unique bin combos
+    bin_combos = list(itertools.combinations(bins, 2))
+    # In each tuple, switch the order of the bin such that we plot the lower triangle
+    bin_combos = [(bin2, bin1) for bin1, bin2 in bin_combos]
+
+    # Run t-test for each bin combo and then plot as a lower triangle heatmap
+
+    # Instantiate a square dataframe with nans
+    df_pvals = pd.DataFrame(data=np.nan, index=bins, columns=bins)
+
+    for bin1, bin2 in bin_combos:
+        t, p = ttest_ind(df_item_bins.loc[df_item_bins[f'{x_val_feat}_bin'] == bin1, y_val],
+                         df_item_bins.loc[df_item_bins[f'{x_val_feat}_bin'] == bin2, y_val])
+
+        # Add to dataframe
+        df_pvals.loc[bin1, bin2] = p
+
+    # Plot the pvals as a heatmap
+    # Use a cmap where low values are green and high values are red
+    cmap = 'RdYlGn_r'
+
+    # Convert index and columns to integers
+    df_pvals.index = df_pvals.index.astype(int)
+    df_pvals.columns = df_pvals.columns.astype(int)
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+    sns.heatmap(df_pvals,
+                annot=True,
+                ax=ax, cmap=cmap,
+                vmin=0, vmax=1,
+                square=True,
+                cbar_kws={"shrink": .5},
+                annot_kws={"size": 15},)
+    ax.set_title(f'Uncorrected stats: {d_axes_legend[x_val_feat]}',
+                 fontsize=20)
+    ax.set_xlabel(f'{d_axes_legend[x_val_feat]} bin', fontsize=15)
+    ax.set_ylabel(f'{d_axes_legend[x_val_feat]} bin', fontsize=15)
+    # Make ticks and tick labels larger
+    ax.tick_params(axis='both', which='major', labelsize=15)
+    ax.tick_params(axis='both', which='minor', labelsize=15)
+    plt.tight_layout()
+    if save:
+        # Replace 'binned_feat' with 'binned_feat_uncorr-stats_'
+        savestr_uncor = savestr.replace('binned-feat', 'binned-feat_uncorr-stats_')
+        savestr_uncor = shorten_savestr(savestr=savestr_uncor)
+        os.chdir(PLOTDIR)
+        plt.savefig(f'{savestr_uncor}.pdf', dpi=300)
+
+        # Save the pvals as a csv
+        os.chdir(CSVDIR)
+        df_pvals.to_csv(f'{savestr_uncor}_pvals.csv')
+
+        # Also save df_item_bins as a csv (just this one, for correct it is obv the same)
+        df_item_bins.to_csv(f'{savestr_uncor}_df_item_bins.csv')
+
+    plt.show()
+
+    # Correct using benjamini hochberg and add to a new dataframe
+    df_pvals_bh = df_pvals.copy(deep=True)
+    mask = np.tril(np.ones(df_pvals_bh.shape), k=-1).astype(np.bool)
+    p_vals_masked = df_pvals_bh.values[mask]
+
+    # Correct using benjamini hochberg
+    reject, pvals_corrected, alphacSidak, alphacBonf = multipletests(p_vals_masked, alpha=0.05, method='fdr_bh')
+
+    # Add to dataframe
+    df_pvals_bh.values[mask] = pvals_corrected
+
+    # Plot the corrected pvals as a heatmap
+    fig, ax = plt.subplots(figsize=(8, 8))
+    sns.heatmap(df_pvals_bh,
+                annot=True,
+                ax=ax, cmap=cmap,
+                vmin=0, vmax=1,
+                square=True,
+                cbar_kws={"shrink": .5},
+                annot_kws={"size": 15},)
+    ax.set_title(f'FDR-corrected BH: {d_axes_legend[x_val_feat]}',
+                 fontsize=20)
+    ax.set_xlabel(f'{d_axes_legend[x_val_feat]} bin', fontsize=15)
+    ax.set_ylabel(f'{d_axes_legend[x_val_feat]} bin', fontsize=15)
+    # Make ticks and tick labels larger
+    ax.tick_params(axis='both', which='major', labelsize=15)
+    ax.tick_params(axis='both', which='minor', labelsize=15)
+    plt.tight_layout()
+    if save:
+        savestr_bh = savestr.replace('binned-feat', 'binned-feat_bh-corr-stats_')
+        savestr_bh = shorten_savestr(savestr=savestr_bh)
+        os.chdir(PLOTDIR)
+        plt.savefig(f'{savestr_bh}.pdf', dpi=300)
+
+        # Save the pvals as a csv
+        os.chdir(CSVDIR)
+        df_pvals_bh.to_csv(f'{savestr_bh}_pvals.csv')
+
+    plt.show()
+
+
 def make_ROI_labels_nice(roi_list: typing.Union[list, np.ndarray],
                          ):
     """Make the ROI labels nicer by:
