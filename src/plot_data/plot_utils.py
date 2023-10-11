@@ -594,6 +594,172 @@ def item_scatter(df: pd.DataFrame,
         plt.show()
 
 
+def item_scatter_surp_preds(df: pd.DataFrame,
+                 rois_of_interest: str,
+                 target_UIDs: typing.Union[list, np.ndarray],
+                 x_val: str = f'encoding_model_pred',
+                 y_val: str = 'response_target',
+                 yerr_type: typing.Union[str, None] = 'sem_over_UIDs',
+                 add_mean: bool = False,
+                 xlim: typing.Union[list, np.ndarray, None] = None,
+                 ylim: typing.Union[list, np.ndarray, None] = None,
+                 plot_aspect: float = 1,
+                 add_identity: bool = True,
+                 save: bool = False,
+                 base_savestr: str = '',
+                 add_savestr: str = '',
+                 PLOTDIR: typing.Union[str, None] = None,
+                 CSVDIR: typing.Union[str, None] = None,
+                 ):
+    """
+	Plot scatter per item. For use with SI 16 and predictions from the surprisal models. 
+
+	Args
+		df (pd.DataFrame): Dataframe with rows = items (responses averaged across individuals) and cols with neural data and condition info.
+        target_UIDs (list): only for savestr. The data has already been averaged over the participants of interest.
+		rois_of_interest: str, which ROIs to plot (uses the dictionary d_roi_lists_names)
+		x_val (str): Which column to use for the x-axis (Predicted response intended:
+			'encoding_model_pred')
+		y_val (str): Which column to use for the y-axis (Actual response intended)
+		yerr_type (bool): which y error to compute, options are:
+			'sem_over_UIDs': compute sem (ddof=1) across participants for a given item
+		add_mean (bool): whether to add a mean line to the plot of the conditions
+		xlim (list): x-axis limits
+		ylim (list): y-axis limits
+		plot_aspect (float): aspect ratio of the plot
+		add_identity (bool): whether to add an identity line to the plot, x=y
+		base_savestr (str): Base string to use for saving the plot
+		add_savestr (str): Additional string to use for saving the plot
+		save (bool): Whether to save the plot)"""
+
+    # Define savestr
+    target_UIDs_str = '-'.join(target_UIDs)
+
+    # Filter data
+    rois_of_interest, rois_of_interest_name = get_roi_list_name(rois_of_interest=rois_of_interest)
+
+    for roi in rois_of_interest:
+
+        # If xlim and ylim are not None, join them into a string
+        if xlim is not None:
+            xlim_str = f'{xlim[0]}-{xlim[1]}'
+        else:
+            xlim_str = 'None'
+        if ylim is not None:
+            ylim_str = f'{ylim[0]}-{ylim[1]}'
+        else:
+            ylim_str = 'None'
+
+        savestr = f'item-scatter_' \
+                  f'X={x_val}_Y={y_val}_' \
+                  f'YERR={yerr_type}_' \
+                  f'xl={xlim_str}_yl={ylim_str}_' \
+                  f'mean={add_mean}_' \
+                  f'a={plot_aspect}_' \
+                  f'i={add_identity}_' \
+                  f'{target_UIDs_str}_{roi}_' \
+                  f'{base_savestr}{add_savestr}'
+
+        df_roi = df.copy(deep=True).query(f'roi == "{roi}"')
+
+        # Create df that is grouped by item id. Keep string columns as is
+        df_item_id = groupby_coord(df=df_roi, coord_col='item_id', aggfunc='mean', )
+
+        # Get yerr
+        if yerr_type is not None:
+            if yerr_type == 'sem_over_UIDs':
+                df_yerr = groupby_coord(df=df_roi, coord_col='item_id', aggfunc='sem', )
+
+        # Scatterplot
+        color_order = [d_colors[x] for x in df_item_id['cond'].values]
+
+        df_x = df_item_id.copy(deep=True).loc[:, [x_val]]
+
+        assert (df_x.index == df_item_id.index).all(), 'Index of df_x and df_item_id do not match'
+
+        if add_mean:  # We want to compute the means of the conditions and add them to the plot as horizontal lines
+            df_mean = df_item_id.groupby('cond').mean().loc[:, [x_val, y_val]]
+
+        # Print min/max of x and y (to ensure all data points are within the plot limits)
+        print(f'Min of {x_val}: {df_x[x_val].min():2f} and max of {x_val}: {df_x[x_val].max():2f}')
+        print(f'Min of {y_val}: {df_item_id[y_val].min():2f} and max of {y_val}: {df_item_id[y_val].max():2f}')
+
+        # Plot
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.set_box_aspect(plot_aspect)
+        ax.scatter(df_x[x_val],  # Predicted
+                   df_item_id[y_val],  # Actual
+                   c=color_order,
+                   alpha=0.6,
+                   edgecolors='none')
+        if yerr_type is not None:
+            ax.errorbar(df_x[x_val],  # Predicted
+                        df_item_id[y_val],  # Actual
+                        yerr=df_yerr[y_val],
+                        fmt='none',
+                        # use color_order for the error bars as well
+                        ecolor=color_order,
+                        alpha=0.7,
+                        linewidth=0.4)
+        if add_mean:
+            for cond in df_mean.index:
+                ax.axhline(df_mean.loc[cond, y_val], color=d_colors[cond], linestyle='--', alpha=0.6)
+        # Make ticks and axis labels bigger
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
+        if x_val in d_axes_legend:
+            plt.xlabel(d_axes_legend[x_val], fontsize=16)
+        else:
+            plt.xlabel(x_val, fontsize=16)
+        if y_val.endswith('noise'):
+            plt.ylabel(d_axes_legend[y_val], fontsize=16)  # f'Actual ({target_UIDs_str})'
+        else:
+            plt.ylabel(f'Actual ({target_UIDs_str})', fontsize=16)
+        plt.title("\n".join(wrap(savestr, 60)), fontsize=14)
+        if xlim is not None:
+            plt.xlim(xlim)
+        if ylim is not None:
+            plt.ylim(ylim)
+        if add_identity:  # Plot x=y line
+            plot_identity(ax, color='black', linestyle='-', alpha=0.6)
+        plt.tight_layout()
+        # Obtain r value for all values plotted, and for T, D, and B conds separately. Add numbers to plot
+        r, p = pearsonr(df_x[x_val], df_item_id[y_val])
+        r_B, p_B = pearsonr(df_x.loc[df_item_id['cond'] == 'B', x_val],
+                            df_item_id.loc[df_item_id['cond'] == 'B', y_val])
+        r_D, p_D = pearsonr(df_x.loc[df_item_id['cond'] == 'D', x_val],
+                            df_item_id.loc[df_item_id['cond'] == 'D', y_val])
+        r_S, p_S = pearsonr(df_x.loc[df_item_id['cond'] == 'S', x_val],
+                            df_item_id.loc[df_item_id['cond'] == 'S', y_val])
+        plt.text(0.01, 0.95, f'r={r:.2f}, p={p:.3}', fontsize=10, transform=plt.gca().transAxes)
+        plt.text(0.01, 0.90, f'r_T={r_B:.2f}, p_T={p_B:.3}', fontsize=10, transform=plt.gca().transAxes)
+        plt.text(0.01, 0.85, f'r_D={r_D:.2f}, p_D={p_D:.3}', fontsize=10, transform=plt.gca().transAxes)
+        plt.text(0.01, 0.80, f'r_B={r_S:.2f}, p_B={p_S:.3}', fontsize=10, transform=plt.gca().transAxes)
+        if save:
+            savestr = shorten_savestr(savestr=savestr)
+
+            os.chdir(PLOTDIR)
+            plt.savefig(savestr + '.pdf', dpi=300)
+
+            os.chdir(CSVDIR)
+            # Merge df with df_x and save
+            df_item_id_store = pd.concat([df_item_id.rename(columns={y_val: f'y_{y_val}'}),
+                                          # Ensure that our x and y vals are renamed such that we know what was plotted
+                                          df_x.rename(columns={x_val: f'x_{x_val}'})], axis=1)
+            # Add a col with the r and p values
+            df_item_id_store['r_all-conds'] = r
+            df_item_id_store['p_all-conds'] = p
+            df_item_id_store['r_B'] = r_B
+            df_item_id_store['p_B'] = p_B
+            df_item_id_store['r_D'] = r_D
+            df_item_id_store['p_D'] = p_D
+            df_item_id_store['r_S'] = r_S
+            df_item_id_store['p_S'] = p_S
+
+            df_item_id_store.to_csv(savestr + '.csv')
+        plt.show()
+
+
 def NC_across_ROIs(df: pd.DataFrame,
                    rois: typing.Union[list, np.ndarray],
                    nc_col: str = 'nc',
@@ -1508,3 +1674,853 @@ def plot_identity(axes, *line_args, **line_kwargs):
     axes.callbacks.connect('xlim_changed', callback)
     axes.callbacks.connect('ylim_changed', callback)
     return axes
+
+
+def val_across_layers(df: pd.DataFrame,
+                        val: str = 'CV_score_mean',
+                        val_err: typing.Union[str,None] = 'CV_score_sem',
+                        add_NC: bool = True,
+                        rois_of_interest: str = 'lang_LH_ROIs',
+                        ylim: typing.Union[tuple, None] = (-0.15, 0.3),
+                        alpha: float = 0.7,
+                        save: bool = True,
+                        base_savestr = '',
+                        add_savestr: str = '',
+                        PLOTDIR: str = '',
+                        CSVDIR: str = '',
+                        **kwargs):
+    """
+    Obtain one instantiation of an encoding analysis. The goal is to obtain a dataframe that has rows according to
+    number of source layers (one model) and plot the results (val) across layers for rois of interest.
+    
+    Args:
+        val: str, which column (value) to plot
+        val_err: str, which column (value) to use for errorbars. 'CV_score_sem' is the default which is SEM across
+            CV folds.
+        add_NC: bool, whether to add NC to the plot
+        rois_of_interest: str, which ROIs to plot (uses the dictionary d_roi_lists_names)
+        ylim: tuple, y-axis limits
+        alpha: float, transparency of the plot
+        save: bool, whether to save the plot
+        add_savestr: str, additional string to add to savestr
+        PLOTDIR: str, path to plot directory
+        CSVDIR: str, path to csv directory
+        
+    
+    """
+    df = df.copy(deep=True)
+
+    ###### GET ROI NAMES ######
+    rois_of_interest, rois_of_interest_name = get_roi_list_name(rois_of_interest=rois_of_interest)
+
+    add_savestr = [f'_{add_savestr}' if add_savestr else ''][0]
+
+    ###### ITERATE & PLOT ######
+    for UID in df.UID.unique():
+        for norm in df.norm.unique():
+            for source_model in df.source_model.unique():
+                for sent_embed in df.sent_embed.unique():
+                    
+                    # Get df for this instantiation
+                    df_q = df.query(
+                                    f'UID == "{UID}" and '
+                                    f'norm == "{norm}" and '
+                                    f'source_model == "{source_model}" and '
+                                    f'sent_embed == "{sent_embed}"')
+                    
+                    # If df is empty, skip
+                    if df_q.empty:
+                        print(f'Empty df for {UID} {norm} {source_model} {sent_embed}')
+                        continue
+                    
+                    # Constrain to ROIs of interest
+                    print(rois_of_interest)
+                    df_q = df_q.loc[df_q.index.isin(rois_of_interest)]
+
+                    # Sort by layers
+                    assert(df_q.source_layer.unique().shape[0] * len(rois_of_interest) == df_q.shape[0])
+                    df_q = df_q.sort_values('source_layer') # Contains the ROIs of interest across all source layers
+
+                    # Define savestr
+                    savestr = f'val-across-layers_' \
+                              f'VAL={val}_ERR={val_err}_' \
+                              f'yl={ylim}_' \
+                              f'NC={add_NC}_' \
+                              f'layers-n={len(df_q.source_layer.unique())}_' \
+                              f'{UID}_{rois_of_interest_name}_' \
+                              f'{base_savestr}' \
+                              f'{add_savestr}'
+
+                    # Use savestr as titlestr, but wrap at 50 characters
+                    titlestr = '\n'.join(wrap(savestr, 60))
+
+                    print(f'Plotting {savestr}\n'
+                          f'Unique layers: {len(df_q.source_layer.unique())} and '
+                          f'unique ROIs: {len(df_q.index.unique())}\n'
+                          f'Yields {len(df_q.index)} rows\n')
+                    
+                    # Plot CV score across layers for this UID as points and lines for each ROI
+                    fig, ax = plt.subplots(figsize=(10, 7))
+                    ax.set_box_aspect(0.6)
+                    ax.set_xlabel('Source layer')
+                    # ax.set_xticks(df_q.source_layer.unique())
+                    if ylim is not None:
+                        ax.set_ylim(ylim)
+                    ax.set_ylabel(d_axes_legend[val])
+                    for roi in df_q.index.unique():
+                        df_roi = df_q.loc[df_q.index == roi]
+                        # Use the d_roi_color if exists, else use the default color
+                        try:
+                            color = d_netw_colors[roi]
+                        except:
+                            color = 'grey'
+                        # plot with errorbars
+                        if val_err:
+                            ax.errorbar(df_roi.source_layer, df_roi[val], yerr=df_roi[val_err], color=color,
+                                        alpha=alpha - 0.2, linewidth=2, elinewidth=1.5)
+                        ax.plot(df_roi.source_layer, df_roi[val], '-', label=roi, color=color, alpha=alpha,
+                                linewidth=1.5)
+                        # Add NC as a dashed line with fill between split_half_se
+                        if add_NC:
+                            ax.plot(df_roi.source_layer, df_roi['nc'], '--', color='gray',
+                                    alpha=alpha - 0.2, linewidth=2)
+                            ax.fill_between(df_roi.source_layer, df_roi['nc'] - df_roi['split_half_se'],
+                                            df_roi['nc'] + df_roi['split_half_se'], color='gray',
+                                            edgecolor='none',
+                                            alpha=0.15)
+                    # Get legend outside of the plot
+                    plt.legend(loc='upper left', bbox_to_anchor=(1.05, 1.05))
+                    plt.title(titlestr, fontsize=12)
+                    plt.tight_layout(pad=2)
+                    plt.xticks(fontsize=14)
+                    plt.yticks(fontsize=14)
+                    # Make legends bigger
+                    for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
+                                 ax.get_xticklabels() + ax.get_yticklabels()):
+                        item.set_fontsize(14)
+                    if save:
+                        savestr = shorten_savestr(savestr=savestr)
+                        os.chdir(PLOTDIR)
+                        plt.savefig(f'{savestr}.pdf', dpi=180)
+                        os.chdir(CSVDIR)
+                        df_q.to_csv(f'{savestr}.csv')
+                    plt.tight_layout()
+                    plt.show()
+
+
+def val_across_layers_target_uids(df: pd.DataFrame,
+                                  roi: str = 'lang_LH_netw',
+                                  val: str = 'full_score',
+                                  add_NC: bool = False,
+                                  add_mean: bool = True,
+                                  ylim: tuple = None,
+                                  save: bool = False,
+                                  base_savestr: str = '',
+                                  add_savestr: str = '',
+                                  PLOTDIR: str = '',
+                                  CSVDIR: str = '',
+                                  ):
+    """
+    Plot the CV score across layers for each target UID as points and lines for each ROI.
+    The df contains the full_score for each participant combination, for each layer, for each ROI that was specified.
+
+    If add_mean is True, then the mean of the ROIs of interest ACROSS participants is added to the plot (along with sem).
+    If add_NC is True, then the NC is added to the plot (split_half_se).
+
+    Args:
+        df (pd.DataFrame): df derived from val_across_layers_use_mapping() function. Rows are scores across source
+            layers across participants (a new target_UID held out each time)
+        roi (str): ROI to plot
+        val (str): Value to plot
+        add_NC (bool): If True, then the NC is added to the plot (split_half_se).
+        add_mean (bool): If True, then the mean of the ROIs of interest ACROSS participants is added to the plot (along with sem).
+        ylim (tuple): Ylim for the plot
+        save (bool): If True, then the plot is saved
+        add_savestr (str): Additional string to add to the savestr
+        PLOTDIR (str): Directory to save the plot
+        CSVDIR (str): Directory to save the df
+
+    """
+    assert df.source_model.nunique() == 1
+    assert df.sent_embed.nunique() == 1
+    assert df.mapping_norm.nunique() == 1
+    assert df.target_norm.nunique() == 1
+
+    add_savestr = [f'_{add_savestr}' if add_savestr else ''][0]
+
+    # Get the df for the specified ROI
+    df_roi = df.loc[df.index == roi]
+
+    if add_mean:
+        df_mean_across_uids = df_roi.groupby(['source_layer']).agg({val: ['mean', 'sem']})
+        df_mean_across_uids.columns = ['_'.join(col).strip() for col in df_mean_across_uids.columns.values]
+
+    # Make sure df_target_uid_combs and df_mean_across_uids are sorted according to source_layer
+    assert np.all(np.unique(np.sort(df_roi['source_layer'].values)) == df_mean_across_uids.index.values)
+    assert np.all(np.diff(df_mean_across_uids.index.values) > 0)
+
+    # Define the savestr
+    savestr = f'val-across-layers-target-uids_' \
+                f'VAL={val}_' \
+                f'yl={ylim}_' \
+                f'NC={add_NC}_' \
+                f'mean={add_mean}_' \
+                f'layers-n={len(df_roi.source_layer.unique())}_' \
+                f'{roi}_' \
+                f'{base_savestr}' \
+                f'{add_savestr}'
+
+    # Use savestr as titlestr, but wrap at 50 characters
+    titlestr = '\n'.join(wrap(savestr, 50))
+
+    fig, ax = plt.subplots(figsize=(12, 8))
+    ax.set_box_aspect(0.6)
+    ax.set_xlabel('Source layer')
+    ax.set_ylabel(d_axes_legend[val])
+    for target_uid in df_roi['target_UID'].unique():
+        df_target_uid = df_roi[df_roi['target_UID'] == target_uid]
+        ax.plot(df_target_uid['source_layer'].values, df_target_uid[val].values, '-',
+                label=f'UID: {target_uid}', linewidth=2, alpha=0.8, color=d_uid_colors[str(target_uid)])
+    if add_mean:
+        ax.errorbar(df_mean_across_uids.index.values, df_mean_across_uids[f'{val}_mean'].values,
+                    yerr=df_mean_across_uids[f'{val}_sem'].values, color='black', label='Mean across UIDs',
+                    fmt='-', capsize=0, linewidth=4, elinewidth=1.5, alpha=0.5, zorder=20)
+        ax.plot(df_mean_across_uids.index.values, df_mean_across_uids[f'{val}_mean'].values, '-', alpha=0.5,
+                color='black')
+    if add_NC:
+        ax.plot(df_roi.source_layer, df_roi['nc'], '--', color='gray',
+                alpha=0.5, linewidth=1.5)
+        ax.fill_between(df_roi.source_layer,
+                        df_roi['nc'] - df_roi['split_half_se'],
+                        df_roi['nc'] + df_roi['split_half_se'],
+                        color='gray',
+                        edgecolor='none',
+                        alpha=0.12)
+    if ylim is not None:
+        ax.set_ylim(ylim)
+    # Get legend outside of the plot
+    plt.legend(loc='upper left', bbox_to_anchor=(1.05, 1.05))
+    plt.title(titlestr, fontsize=12)
+    for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
+                 ax.get_xticklabels() + ax.get_yticklabels()):
+        item.set_fontsize(20)
+    plt.tight_layout(pad=1.5)
+    if save:
+        savestr = shorten_savestr(savestr=savestr)
+        os.chdir(PLOTDIR)
+        fig.savefig(f'{savestr}.pdf', dpi=180)
+        os.chdir(CSVDIR)
+        df_roi.to_csv(f'{savestr}.csv')
+    plt.show()
+
+
+def CV_vs_NC(df: pd.DataFrame,
+             cv_col: str = 'CV_score_mean',
+             cv_err_col: str = 'CV_score_sem',
+             nc_col: str = 'nc',
+             nc_err_col: str = 'split_half_se',
+             rois_of_interest: str = 'rois_func_lang_md_dmn',
+             source_layer: typing.Union[str, int, None] = None,
+             xlim: typing.Union[list, np.ndarray] = None,
+             ylim: typing.Union[list, np.ndarray] = None,
+             save: bool = False,
+             base_savestr: str = '',
+             add_savestr: str = '',
+             alpha_err: float = 0.5,
+             alpha_dot: float = 0.7,
+             PLOTDIR: str = '',
+             CSVDIR: str = '',):
+    """
+    Plot CV score vs NC for all ROIs in rois.
+
+    Args:
+        df (pd.DataFrame): Dataframe with CV and NC values. Rois are index.
+        cv_col (str): Column name for CV values.
+        cv_err_col (str): Column name for CV error values.
+        nc_col (str): Column name for NC values.
+        nc_err_col (str): Column name for NC error values.
+        rois_of_interest (list): List of ROIs to plot.
+        source_layer (str, int, None): If not None, plot only for this source layer.
+        xlim (list): List of x-axis limits.
+        ylim (list): List of y-axis limits.
+        save (bool): If True, save the plot.
+        PLOTDIR (str): Path to directory where to save the plot.
+        CSVDIR (str): Path to directory where to save the csv file.
+    """
+    ###### GET ROI NAMES ######
+    rois_of_interest, rois_of_interest_name = get_roi_list_name(rois_of_interest=rois_of_interest)
+    if rois_of_interest is None:
+        # Just use all the ROIs in the dataframe
+        rois_of_interest = df.index.unique().tolist()
+
+    add_savestr = [f'_{add_savestr}' if add_savestr else ''][0]
+
+    ###### ITERATE & PLOT ######
+    if xlim is not None:
+        xlimstr = f'{xlim[0]}-{xlim[1]}'
+    else:
+        xlimstr = 'None'
+    if ylim is not None:
+        ylimstr = f'{ylim[0]}-{ylim[1]}'
+    else:
+        ylimstr = 'None'
+
+    # Get num unique source layers
+    if source_layer is not None:
+        df_q = df.query(f'source_layer == "{source_layer}"')
+    else:
+        df_q = df.copy(deep=True)
+    n_source_layers = len(df_q.source_layer.unique())
+
+    # Get ROIs
+    df_q = df_q.loc[df_q.index.isin(rois_of_interest)]
+    n_rois = len(df_q.index.unique())
+
+    # Define savestr
+    savestr = f'CV_vs_NC_' \
+          f'CV={cv_col}_ERR={cv_err_col}_' \
+          f'NC={nc_col}_ERR={nc_err_col}_' \
+          f'xl={xlimstr}_yl={ylimstr}_' \
+          f'layers-n={n_source_layers}_' \
+          f'{rois_of_interest_name}_' \
+          f'rois-n={n_rois}_' \
+          f'{base_savestr}' \
+          f'{add_savestr}'
+
+    # Same plot but color according to ROI. use d_netw_colors when available, otherwise gray
+    fig, ax = plt.subplots(figsize=(10, 10))
+    for roi in rois_of_interest:
+        df_q_roi = df.query(f'roi == "{roi}"')
+        if roi in d_netw_colors.keys():
+            color = d_netw_colors[roi]
+        else:
+            color = 'grey'
+        if len(df_q_roi) == 0:
+            print(f'No data for {roi}')
+        ax.errorbar(x=df_q_roi[cv_col],
+                    y=df_q_roi[nc_col],
+                    xerr=df_q_roi[cv_err_col],
+                    yerr=df_q_roi[nc_err_col],
+                    ls='none',
+                    ecolor=color,
+                    elinewidth=0.4,
+                    capsize=0,
+                    capthick=0,
+                    label=f'{roi}',
+                    color=color,
+                    markersize=10,
+                    alpha=alpha_err) # default 0.5. for a lot of anatomical ROIs, 0.2 is better
+        ax.scatter(x=df_q_roi[cv_col],
+                   y=df_q_roi[nc_col],
+                   color=color,
+                   label=f'{roi}',
+                   s=100,
+                   alpha=alpha_dot,  # default 0.7. for a lot of anatomical ROIs, 0.2 is better
+                   edgecolors='none')
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
+    # add x=y line
+    plot_identity(ax, color='black', linestyle='-', alpha=0.6)
+    ax.set_xlabel(d_axes_legend[cv_col])
+    ax.set_ylabel(d_axes_legend[nc_col])
+    ax.set_title('\n'.join(wrap(savestr, 80)))
+    # ax.legend()
+    # make ticks bigger and x and y lims
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    # Make x and y labels bigger
+    ax.xaxis.label.set_size(26)
+    ax.yaxis.label.set_size(26)
+    plt.tight_layout()
+    if save:
+        savestr = shorten_savestr(savestr=savestr)
+        os.chdir(PLOTDIR)
+        plt.savefig(f'{savestr}.pdf', dpi=180)
+        os.chdir(CSVDIR)
+        df_q.to_csv(f'{savestr}.csv')
+    plt.show()
+
+
+
+def item_scatter_ngram_cbar(df: pd.DataFrame,
+                             target_UIDs: typing.Union[list, np.ndarray],
+                             rois_of_interest: str,
+                             x_val: str = 'encoding_model_pred',  
+                             y_val: str = 'response_target',
+                             add_mean: bool = False,
+                             xlim: typing.Union[list, np.ndarray, None] = None,
+                             ylim: typing.Union[list, np.ndarray, None] = None,
+                             plot_aspect: float = 1,
+                             add_identity: bool = True,
+                             save: bool = False,
+                             base_savestr: str = '',
+                             add_savestr: str = '',
+                             PLOTDIR: typing.Union[str, None] = None,
+                             CSVDIR: typing.Union[str, None] = None,
+                             NGRAM_DATADIR: typing.Union[str, None] = '',
+                             NGRAM_fname: typing.Union[str, None] = 'SI10_stimset_D-S_light_ngram-overlaps-sentence-level.csv',
+                             ngram_color_col: str = 'T_1gram_overlap',
+                             cmap: str = 'cividis',
+                             ):
+    """
+    Plot scatter per item. Load n-gram overlap statistics from csv file and color the dots accordingly.
+
+    Args
+        df (pd.DataFrame): Dataframe with rows = items (responses for individual participants) and cols with neural data and condition info.
+        target_UIDs (list): List of target UIDs to include in the plot
+        rois_of_interest: str, which ROIs to plot (uses the dictionary d_roi_lists_names)
+        x_val (str): Which column to use for the x-axis (Predicted response intended:
+            'pred-full_from-848-853-865-875-876' or 'pred-CV-k-5_from-848-853-865-875-876')
+        y_val (str): Which column to use for the y-axis (Actual response intended)
+        add_mean (bool): whether to add a mean line to the plot of the conditions
+        xlim (list): x-axis limits
+        ylim (list): y-axis limits
+        plot_aspect (float): aspect ratio of the plot
+        add_identity (bool): whether to add an identity line to the plot, x=y
+        base_savestr (str): Base string to use for saving the plot
+        add_savestr (str): Additional string to use for saving the plot
+        save (bool): Whether to save the plot)"""
+
+    # Define savestr
+    target_UIDs_str = '-'.join(target_UIDs)
+
+    # Filter data
+    df = df.copy(deep=True)[df['target_UID'].isin([int(x) for x in target_UIDs])]
+    rois_of_interest, rois_of_interest_name = get_roi_list_name(rois_of_interest=rois_of_interest)
+
+    for roi in rois_of_interest:
+
+        # If xlim and ylim are not None, join them into a string
+        if xlim is not None:
+            xlim_str = f'{xlim[0]}-{xlim[1]}'
+        else:
+            xlim_str = 'None'
+        if ylim is not None:
+            ylim_str = f'{ylim[0]}-{ylim[1]}'
+        else:
+            ylim_str = 'None'
+
+        savestr = f'item-scatter-ngram-cbar-{ngram_color_col}_' \
+                  f'X={x_val}_Y={y_val}_' \
+                  f'xl={xlim_str}_yl={ylim_str}_' \
+                  f'mean={add_mean}_' \
+                  f'a={plot_aspect}_' \
+                  f'i={add_identity}_' \
+                  f'{target_UIDs_str}_{roi}_' \
+                  f'{base_savestr}{add_savestr}'
+
+        df_roi = df.copy(deep=True).query(f'roi == "{roi}"')
+
+        print(f'\n\nPlotting: {savestr}\n'
+              f'Total number of data points across {len(df_roi.target_UID.unique())} participants: {len(df_roi)}')
+
+        # Create df that is grouped by item id. Keep string columns as is
+        df_item_id = groupby_coord(df=df_roi, coord_col='item_id', aggfunc='mean',)
+
+        ##### LOAD GRAM DATA #####
+        # Load n-gram data
+        df_ngram = pd.read_csv(os.path.join(NGRAM_DATADIR, NGRAM_fname))
+
+        # Get n-gram data for the item_ids in df_item_id
+        df_ngram_item_id = df_ngram.copy(deep=True).query('item_id in @df_item_id.index.values')
+
+        assert(df_item_id.index.values == df_ngram_item_id.item_id.values).all()
+        assert(df_item_id.sentence.values == df_ngram_item_id.sentence.values).all()
+
+        # Add n-gram data to df_item_id
+        merge_cols = [col for col in df_ngram_item_id.columns if col.endswith('gram_overlap')]
+        df_item_id = pd.merge(df_item_id, df_ngram_item_id.loc[:, ['item_id', 'sentence'] + merge_cols], how='left', on=['item_id', 'sentence'])
+
+        # Only get the D and S conds (we only have n-gram quantifications for those wrt baseline)
+        df_item_id = df_item_id.copy(deep=True).query('cond in ["D", "S"]')
+        print(f'Number of items in D and S conds: {len(df_item_id)}')
+
+        # Scatterplot
+
+        # Get the x-value
+        df_x = df_item_id.copy(deep=True).loc[:, [x_val]]
+
+        assert (df_x.index == df_item_id.index).all(), 'Index of df_x and df_item_id do not match'
+
+        if add_mean: # We want to compute the means of the conditions and add them to the plot as horizontal lines
+            df_mean = df_item_id.groupby('cond').mean().loc[:, [x_val, y_val]]
+
+        # Print min/max of x and y (to ensure all data points are within the plot limits)
+        print(f'Min of {x_val}: {df_x[x_val].min():2f} and max of {x_val}: {df_x[x_val].max():2f}')
+        print(f'Min of {y_val}: {df_item_id[y_val].min():2f} and max of {y_val}: {df_item_id[y_val].max():2f}')
+
+        from matplotlib import patches as mpatches
+
+        # Plot
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.set_box_aspect(plot_aspect)
+        scatterplot = ax.scatter(df_x[x_val],  # Predicted
+                   df_item_id[y_val],  # Actual
+                   c=[d_colors_ngram[cond] for cond in df_item_id[ngram_color_col]],
+                   alpha=0.8,
+                   edgecolors='none',)
+        # Add legend
+        plt.legend(handles=[mpatches.Patch(color=d_colors_ngram[x], label=x) for x in d_colors_ngram.keys()],
+                   bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.,
+                   # add legend title
+                     title=d_axes_legend[ngram_color_col],)
+        if add_mean:
+            for cond in df_mean.index:
+                ax.axhline(df_mean.loc[cond, y_val], color=d_colors[cond], linestyle='--', alpha=0.6)
+        # Make ticks and axis labels bigger
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
+        if x_val in d_axes_legend:
+            plt.xlabel(d_axes_legend[x_val], fontsize=16)
+        else:
+            plt.xlabel(x_val, fontsize=16)
+        if y_val.endswith('noise'):
+            plt.ylabel(d_axes_legend[y_val], fontsize=16) # f'Actual ({target_UIDs_str})'
+        else:
+            plt.ylabel(f'Actual ({target_UIDs_str})', fontsize=16)
+        plt.title("\n".join(wrap(savestr, 60)), fontsize=14)
+        if xlim is not None:
+            plt.xlim(xlim)
+        if ylim is not None:
+            plt.ylim(ylim)
+        if add_identity: # Plot x=y line
+            plot_identity(ax, color='black', linestyle='-', alpha=0.6)
+        plt.tight_layout()
+        # Obtain r value for all values plotted, and for T, D, and B conds separately. Add numbers to plot
+        r, p = pearsonr(df_x[x_val], df_item_id[y_val])
+        r_D, p_D = pearsonr(df_x.loc[df_item_id['cond'] == 'D', x_val],
+                            df_item_id.loc[df_item_id['cond'] == 'D', y_val])
+        r_S, p_S = pearsonr(df_x.loc[df_item_id['cond'] == 'S', x_val],
+                            df_item_id.loc[df_item_id['cond'] == 'S', y_val])
+        plt.text(0.01, 0.95, f'r={r:.2f}, p={p:.3}', fontsize=10, transform=plt.gca().transAxes)
+        plt.text(0.01, 0.85, f'r_D={r_D:.2f}, p_D={p_D:.3}', fontsize=10, transform=plt.gca().transAxes)
+        plt.text(0.01, 0.80, f'r_S={r_S:.2f}, p_S={p_S:.3}', fontsize=10, transform=plt.gca().transAxes)
+        plt.tight_layout()
+        if save:
+            savestr = shorten_savestr(savestr=savestr)
+
+            os.chdir(PLOTDIR)
+            plt.savefig(savestr + '.pdf', dpi=300)
+
+            os.chdir(CSVDIR)
+            # Merge df with df_x and save
+            df_item_id_store = pd.concat([df_item_id.rename(columns={y_val: f'y_{y_val}'}),
+                                          # Ensure that our x and y vals are renamed such that we know what was plotted
+                                          df_x.rename(columns={x_val: f'x_{x_val}'})], axis=1)
+            # Add a col with the r and p values
+            df_item_id_store['r_all-conds'] = r
+            df_item_id_store['p_all-conds'] = p
+            df_item_id_store['r_D'] = r_D
+            df_item_id_store['p_D'] = p_D
+            df_item_id_store['r_S'] = r_S
+            df_item_id_store['p_S'] = p_S
+
+            df_item_id_store.to_csv(savestr + '.csv')
+        plt.show()
+
+def abs_diff_vs_ngram_overlap(df: pd.DataFrame,
+                            target_UIDs: typing.Union[list, np.ndarray],
+                            rois_of_interest: str,
+                            x_val: str = 'encoding_model_pred',
+                            y_val: str = 'response_target',
+                            save: bool = False,
+                            base_savestr: str = '',
+                            add_savestr: str = '',
+                            PLOTDIR: typing.Union[str, None] = None,
+                            CSVDIR: typing.Union[str, None] = None,
+                            NGRAM_DATADIR: typing.Union[str, None] = '',
+                            NGRAM_fname: typing.Union[str, None] = 'SI10_stimset_D-S_light_ngram-overlaps-sentence-level.csv',
+                            ngram_color_col: str = 'T_1gram_overlap',
+                            ylim: typing.Union[list, None] = [-0.1,2],
+                            ):
+    """
+    Plot scatter of absolute difference vs n-gram occurrence count.
+    Color according to n-gram occurrence count.
+    Load n-gram overlap statistics from csv file and color the dots accordingly.
+
+    Args
+        df (pd.DataFrame): Dataframe with rows = items (responses for individual participants) and cols with neural data and condition info.
+        target_UIDs (list): List of target UIDs to include in the plot
+        rois_of_interest: str, which ROIs to plot (uses the dictionary d_roi_lists_names)
+        x_val (str): Which column to use for the x-axis (Predicted response intended:
+            'pred-full_from-848-853-865-875-876' or 'pred-CV-k-5_from-848-853-865-875-876')
+        y_val (str): Which column to use for the y-axis (Actual response intended)
+        add_mean (bool): whether to add a mean line to the plot of the conditions
+        xlim (list): x-axis limits
+        ylim (list): y-axis limits
+        plot_aspect (float): aspect ratio of the plot
+        add_identity (bool): whether to add an identity line to the plot, x=y
+        base_savestr (str): Base string to use for saving the plot
+        add_savestr (str): Additional string to use for saving the plot
+        save (bool): Whether to save the plot)"""
+
+    # Define savestr
+    target_UIDs_str = '-'.join(target_UIDs)
+
+    # Filter data
+    df = df.copy(deep=True)[df['target_UID'].isin([int(x) for x in target_UIDs])]
+    rois_of_interest, rois_of_interest_name = get_roi_list_name(rois_of_interest=rois_of_interest)
+
+    for roi in rois_of_interest:
+
+        savestr = f'abs_diff_vs_ngram_overlap-{ngram_color_col}_' \
+                  f'abs-diff-X={x_val}-Y={y_val}_' \
+                  f'{target_UIDs_str}_{roi}_' \
+                  f'{base_savestr}{add_savestr}'
+
+        df_roi = df.copy(deep=True).query(f'roi == "{roi}"')
+
+        print(f'\n\nPlotting: {savestr}\n'
+              f'Total number of data points across {len(df_roi.target_UID.unique())} participants: {len(df_roi)}')
+
+        # Create df that is grouped by item id. Keep string columns as is
+        df_item_id = groupby_coord(df=df_roi, coord_col='item_id', aggfunc='mean', )
+
+        ##### LOAD GRAM DATA #####
+        # Load n-gram data
+        df_ngram = pd.read_csv(os.path.join(NGRAM_DATADIR, NGRAM_fname))
+
+        # Get n-gram data for the item_ids in df_item_id
+        df_ngram_item_id = df_ngram.copy(deep=True).query('item_id in @df_item_id.index.values')
+
+        assert (df_item_id.index.values == df_ngram_item_id.item_id.values).all()
+        assert (df_item_id.sentence.values == df_ngram_item_id.sentence.values).all()
+
+        # Add n-gram data to df_item_id
+        merge_cols = [col for col in df_ngram_item_id.columns if col.endswith('gram_overlap')]
+        df_item_id = pd.merge(df_item_id, df_ngram_item_id.loc[:, ['item_id', 'sentence'] + merge_cols], how='left',
+                              on=['item_id', 'sentence'])
+
+        # Create col that quantifies the abs diff between x and y
+        df_item_id['abs_diff'] = np.abs(df_item_id[x_val] - df_item_id[y_val])
+
+        # Jitter the x-axis
+        x_jitter = 0.1
+
+        # Only get the D and B conditions
+        df_item_id = df_item_id.query('cond in ["D", "S"]')
+        print(f'Number of data points after filtering for D and B conditions: {len(df_item_id)}')
+
+        # Scatter between ngram col and abs diff
+        r, p = pearsonr(df_item_id[ngram_color_col], df_item_id['abs_diff'])
+
+        from matplotlib import patches as mpatches
+
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.scatter(df_item_id[ngram_color_col] + np.random.uniform(-x_jitter, x_jitter, len(df_item_id)),
+                    df_item_id['abs_diff'],
+                    c=[d_colors_ngram[x] for x in df_item_id[ngram_color_col]],
+                   alpha=0.8,
+                     s=40)
+        # Put legend outside of plot
+        plt.legend(handles=[mpatches.Patch(color=d_colors_ngram[x], label=x) for x in d_colors_ngram.keys()],
+                   bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+        plt.xlabel(d_axes_legend[ngram_color_col])
+        plt.ylabel(f'Absolute difference:\n{d_axes_legend[x_val]} - {d_axes_legend[y_val]}',
+                   fontsize=14)
+        plt.title("\n".join(wrap(savestr, 60)), fontsize=14)
+        # add r and p in top right left corner
+        plt.text(0.05, 0.95, f'r={r:.2f}, p={p:.2e}', transform=ax.transAxes)
+        # Make ticks larger
+        ax.tick_params(axis='both', which='major', labelsize=16)
+        # Make labels bigger
+        ax.set_xlabel(ax.get_xlabel(), fontsize=16)
+        if ylim is not None:
+            plt.ylim(ylim)
+        plt.tight_layout()
+        if save:
+            savestr = shorten_savestr(savestr=savestr)
+
+            os.chdir(PLOTDIR)
+            plt.savefig(savestr + '.pdf', dpi=300)
+
+            os.chdir(CSVDIR)
+            # Add the correlation and p-value to the df
+            df_item_id['r'] = r
+            df_item_id['p'] = p
+            df_item_id['num_items'] = len(df_item_id)
+
+            df_item_id.to_csv(savestr + '.csv')
+        plt.show()
+
+
+def ngram_overlap_hist(ngram_col: str = 'T_1gram_overlap',
+                      add_median: bool = False,
+                     ylim: typing.Union[list, np.ndarray, None] = None,
+                     save: bool = False,
+                     base_savestr: str = '',
+                     add_savestr: str = '',
+                     PLOTDIR: typing.Union[str, None] = None,
+                     CSVDIR: typing.Union[str, None] = None,
+                     NGRAM_DATADIR: typing.Union[str, None] = '',
+                     NGRAM_fname: typing.Union[str, None] = 'SI10_stimset_D-S_light_ngram-overlaps-sentence-level.csv',):
+    """
+    Plot a histogram of n-gram overlap values for drive and suppress conditions separately for ngam_col
+
+    Args
+        ngram_col: str
+            Column name in df_ngram that contains the n-gram overlap values
+        add_median: bool
+            Whether to add a vertical line for the median value
+        ylim: list, np.ndarray, None
+            y-axis limits
+        save: bool
+            Whether to save the plot
+        base_savestr: str
+            Base savestr to use for saving the plot
+        add_savestr: str
+            Additional savestr to add to the base savestr
+        PLOTDIR: str, None
+            Directory to save the plot
+        CSVDIR: str, None
+            Directory to save the csv
+        NGRAM_DATADIR: str, None
+            Directory where the n-gram data is stored
+        NGRAM_fname: str, None
+            Filename of the n-gram data
+
+    """
+
+    # Define savestr
+    if ylim is not None:
+        ylim_str = f'ylim={ylim[0]}-{ylim[1]}'
+
+    savestr = f'ngram_overlap_hist-{ngram_col}_' \
+              f'yl={ylim_str}_' \
+              f'median={add_median}_' \
+              f'{base_savestr}{add_savestr}'
+
+    ##### LOAD GRAM DATA #####
+    # Load n-gram data
+    df_ngram = pd.read_csv(os.path.join(NGRAM_DATADIR, NGRAM_fname))
+
+    # Only get the D and B conds (we only have n-gram quantifications for those wrt baseline)
+    df_ngram = df_ngram.query('cond_approach in ["D_search", "S_search"]')
+    print(f'Only using D_search and S_search conditions. Number of items: {len(df_ngram)}')
+
+    # Get the counts for each n-gram overlap value
+    df_ngram_counts = df_ngram.groupby(['cond_approach', ngram_col]).size().reset_index(name='counts')
+
+    #### PLOT HISTOGRAM FOR DRIVE AND SUPPRESS SEPARATELY (using colors from d_colors_ngram) #####
+    for cond in ['D_search', 'S_search']:
+
+        # We want to show 7 bars (0,1,2,3,4,5,6) even though they are empty with the counts in the right color
+        bars = np.arange(0, 7)
+        # Match each bar (ngram_col) with the right count value
+        d = {}
+        for bar_val in bars:
+            if bar_val in df_ngram_counts.query(f'cond_approach == "{cond}"')[ngram_col].unique():
+                d[bar_val] = df_ngram_counts.query(f'cond_approach == "{cond}" and {ngram_col} == {bar_val}')['counts'].values[0]
+            else: # If it did not exist, set it to 0
+                d[bar_val] = 0
+
+        fig, ax = plt.subplots(figsize=(9, 6))
+        ax.bar(bars, [d[x] for x in bars],
+               color=[d_colors_ngram[x] for x in bars])
+        plt.xlabel(f'{ngram_col}')
+        plt.ylabel('Count')
+        plt.title(f'{cond} condition')
+        # Make ticks larger
+        ax.tick_params(axis='both', which='major', labelsize=20)
+        # Make labels bigger
+        ax.set_xlabel(ax.get_xlabel(), fontsize=20)
+        ax.set_ylabel(ax.get_ylabel(), fontsize=24)
+        if ylim is not None:
+            ax.set_ylim(ylim)
+        if add_median:
+            # Add median line (black)
+            plt.axvline(df_ngram.query(f'cond_approach == "{cond}"')[ngram_col].median(),
+                        color='black', linestyle='--', lw=7)
+        plt.tight_layout()
+        if save:
+            savestr = shorten_savestr(savestr=savestr)
+            os.chdir(PLOTDIR)
+            plt.savefig(savestr + f'_{cond}.pdf', dpi=300)
+
+            # Save the counts for each n-gram overlap value
+            os.chdir(CSVDIR)
+            df_ngram_counts.query(f'cond_approach == "{cond}"').to_csv(savestr + f'_{cond}.csv', index=False)
+
+        plt.show()
+
+
+def feature_barplot(df_item_id: pd.DataFrame,
+                    x_val: str,
+                    feat_of_int: str,
+                    d_colors: dict,
+                    ylim: tuple = None,
+                    save: bool = False,
+                    base_savestr: str = '',
+                    add_savestr: str = '',
+                    PLOTDIR: str = None,
+                    CSVDIR: str = None):
+    """
+    Plot barplot of the mean feature values for each sentence property.
+
+    Args
+        df_item_id: dataframe with rows as sentences and columns as features
+        x_val: how to group the data, default would be "cond_approach" (5 values)
+        feat_of_int: which feature to plot
+        d_colors: dictionary of colors for each condition
+        ylim: y-axis limits
+        save: whether to save the plot
+        base_savestr: string to append to the save string
+
+    """
+
+    df_cond = df_item_id.groupby(x_val).mean()
+    if x_val == 'cond_approach':
+        # Reindex such that D_search, B_search, D_synth, B_synth, T are in that order
+        df_cond = df_cond.reindex(['D_search', 'D_modify', 'S_search', 'S_modify', 'B'])
+    else:
+        raise ValueError(f'x_val {x_val} not recognized')
+
+    color_order = [d_colors[x] for x in df_cond.index.values]
+
+    if ylim is not None:
+        ylim_str = f'{ylim[0]}-{ylim[1]}'
+    else:
+        ylim_str = 'None'
+
+    savestr = f'feature-barplot_' \
+              f'X={x_val}_Y={feat_of_int}_' \
+              f'yl={ylim_str}_' \
+              f'{base_savestr}{add_savestr}'
+
+    fig, ax = plt.subplots(1, 1, figsize=(7, 7))
+    # Show mean and individual points
+    plt.bar(df_cond.index,
+            df_cond[feat_of_int],
+            color=color_order,
+            zorder=0, )
+    # jitter points
+    jitter = 0.1
+    for i, cond in enumerate(df_cond.index):
+        plt.scatter(
+            np.random.uniform(i - jitter, i + jitter, len(df_item_id.loc[df_item_id[x_val] == cond, :])),
+            df_item_id.loc[df_item_id[x_val] == cond, :][feat_of_int],
+            s=40,
+            color='black',  # color_order[i],
+            zorder=10,
+            edgecolors='none',
+            alpha=0.3)
+    if ylim is not None:
+        plt.ylim(ylim)
+    plt.ylabel(feat_of_int)
+    plt.title(f'{feat_of_int} across conditions')
+    plt.xticks([0, 1, 2, 3, 4], [d_axes_legend[x] for x in df_cond.index.values], fontsize=19)
+    # Make y axis labels bigger
+    plt.yticks(fontsize=26)
+    plt.ylabel(d_axes_legend[feat_of_int], fontsize=26)
+    plt.title(d_axes_legend[feat_of_int], fontsize=26)
+    plt.tight_layout()
+    if save:
+        savestr = shorten_savestr(savestr=savestr)
+        os.chdir(PLOTDIR)
+        plt.savefig(os.path.join(PLOTDIR, f'{savestr}.pdf'), dpi=180)
+        os.chdir(CSVDIR)
+        # Store just grouped data
+        df_cond.to_csv(os.path.join(CSVDIR, f'{savestr}.csv'))
+
+    plt.show()

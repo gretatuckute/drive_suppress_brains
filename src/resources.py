@@ -30,7 +30,7 @@ d_roi_lists_names = {'lang_LH_netw': ['lang_LH_netw'],
 					 'audvis_anatglasser_ROIs': ['anatglasser_LH_AudPrimary', 'anatglasser_RH_AudPrimary',
 									   'anatglasser_LH_V1', 'anatglasser_RH_V1',],
 					 # 'lang_anatglasser_ROIs': list(d_anatglasser_networks['lang'].keys()),
-					 # 'anatglasser_LH_LangNetw': ['anatglasser_LH_LangNetw'],
+					 'anatglasser_LH_LangNetw': ['anatglasser_LH_LangNetw'],
 					 # 'lang_LH_anatglasser_ROIs': [x for x in list(d_anatglasser_networks['lang'].keys()) if x.startswith('anatglasser_LH_') and not x.endswith('AngG')],
 					 # 'lang_RH_anatglasser_ROIs': [x for x in list(d_anatglasser_networks['lang'].keys()) if x.startswith('anatglasser_RH_') and not x.endswith('AngG')],
 
@@ -68,6 +68,12 @@ d_colors = {'S': 'royalblue',
 			'aud': 'darkorchid'
 			}
 
+d_uid_colors = {
+	'848': 'lightsteelblue',
+	'853': 'goldenrod',
+	'865': 'darkkhaki',
+	'875': 'mediumaquamarine',
+	'876': 'palevioletred',}
 
 d_netw_colors = {
 	'lang_LH_netw': 'firebrick',
@@ -134,6 +140,13 @@ d_netw_colors = {
 	# 'anatglasser_LHRH_AudPrimary': 'slategrey',
 }
 
+d_colors_ngram = {0: 'gold',
+				  1: 'goldenrod',
+				  2: 'darkorange',
+				  3: 'red',
+				  4: 'mediumvioletred',
+				  5: 'darkviolet',
+				  6: 'indigo'}
 
 d_symbols = {'B': 'o',
 			 'D_search': 's',
@@ -319,3 +332,24 @@ def item_scatter_style(style_setting: str):
 		raise ValueError(f'Invalid style_setting: {style_setting}')
 
 	return plot_aspect_flag, add_identity_flag, d_xlim, d_ylim
+
+
+def get_roi_list_name(rois_of_interest: str):
+	"""
+	If roi exists in d_roi_lists_names, use the name in the dictionary otherwise use the string itself.
+	E.g. if we pass rois_of_interest = 'lang_LH_ROIs', we get back the list of ROIs in the language network.
+	We do retain the 'lang_LH_ROIs' as the name (for use in save string, etc.)
+
+
+	:param rois_of_interest:
+	:param d_roi_lists_names:
+	:return:
+	"""
+
+	rois_of_interest_name = rois_of_interest
+	if rois_of_interest in d_roi_lists_names.keys():
+		rois_of_interest = d_roi_lists_names[rois_of_interest]
+	else:
+		rois_of_interest = None # I.e. just use the string as the name, and pass a None such that we use all ROIs
+
+	return rois_of_interest, rois_of_interest_name
