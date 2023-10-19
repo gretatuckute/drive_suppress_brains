@@ -1017,16 +1017,17 @@ class Mapping:
 		# Store a simple dict structure with keys "y" and "y_pred-CV-k-{k}" which has the actual value and predicted
 		# value for each item, obtained across all folds
 
-		# First make sure that y_tests and y are the same
+		# First make sure that y_tests and y are the same (if we scaled, then this is not true -- the data will be shifted (mean) or scaled (std))
 		df_y_tests = pd.concat(y_tests)  # Concat the list of dfs in y_tests
 		df_y_tests = df_y_tests.reindex(y.index)
-		assert (df_y_tests.equals(y))
+		if not self.preprocess_y:
+			assert (df_y_tests.equals(y))
 
 		df_y_preds = pd.concat(y_preds_cv)  # Concat the list of dfs in y_preds_cv
 		df_y_preds = df_y_preds.reindex(y.index)
 
 		# Store the y and y_pred-CV-k-{k} in a dict (similar to the y_pred_full dict)
-		d_CV_pred = self.package_cv_y_pred(y=df_y_tests,
+		d_CV_pred = self.package_cv_y_pred(y=df_y_tests, # we store the preprocessed version of y
 										   y_pred=df_y_preds,
 										   cv_str=f'CV-k-{k}')
 
