@@ -41,12 +41,12 @@ def download_extract_remove(url, extract_location):
 
 # Download the data folder
 if get_data:
-    url_data_folder = 'https://evlabwebapps.mit.edu/public_data/tuckute2023_driving_suppressing/data.tar'
+    url_data_folder = 'https://evlabwebapps.mit.edu/public_data/tuckute2024_driving_suppressing/data.tar'
     download_extract_remove(url_data_folder, ROOT)
 
 # Download the data SI folder
 if get_data_SI:
-    url_data_SI_folder = 'https://evlabwebapps.mit.edu/public_data/tuckute2023_driving_suppressing/data_SI.tar'
+    url_data_SI_folder = 'https://evlabwebapps.mit.edu/public_data/tuckute2024_driving_suppressing/data_SI.tar'
     download_extract_remove(url_data_SI_folder, ROOT)
 
 # Download the GPT2-XL model activations. To the baseline set: beta-control-neural-T
@@ -54,12 +54,12 @@ if get_data_SI:
 # OBS! Large file (~1.6 GB)
 if get_model_actv:
     print(f'OBS! Large file (~1.6 GB)')
-    url_model_actv = 'https://evlabwebapps.mit.edu/public_data/tuckute2023_driving_suppressing/model-actv.tar'
+    url_model_actv = 'https://evlabwebapps.mit.edu/public_data/tuckute2024_driving_suppressing/model-actv.tar'
     download_extract_remove(url_model_actv, ROOT)
 
 # Download the regression weights fitted on the baseline set
 if get_regr_weights:
-    url_regr_weights = 'https://evlabwebapps.mit.edu/public_data/tuckute2023_driving_suppressing/regr-weights.tar'
+    url_regr_weights = 'https://evlabwebapps.mit.edu/public_data/tuckute2024_driving_suppressing/regr-weights.tar'
     download_extract_remove(url_regr_weights, ROOT)
 
 
