@@ -1,7 +1,8 @@
 ## Driving and suppressing the human language network using large language models
 
 This repository contains code and data accompanying: 
-G. Tuckute, A. Sathe, S. Srikant, M. Taliaferro, M. Wang, M. Schrimpf, K. Kay, E. Fedorenko (2023): _Driving and suppressing the human language network using large language models_.
+
+Tuckute, G., Sathe, A., Srikant, S., Taliaferro, M., Wang, M., Schrimpf, M., Kay, K., Fedorenko, E.: _Driving and suppressing the human language network using large language models_. Nat Hum Behav (2024). https://doi.org/10.1038/s41562-023-01783-7
 
 ## Environment
 The environment is a Python 3.8.11 environment that makes heavy use of [pandas](https://pandas.pydata.org/), [scikit-learn](https://scikit-learn.org/stable/), [HuggingFace Transformers](https://huggingface.co/docs/transformers/index), and [matplotlib](https://matplotlib.org/). To use the exact Python environment used in the paper, install it as:
@@ -62,59 +63,20 @@ All code is in `src`.
 	2. [/src/run_analyses/use_mapping_external.py](https://github.com/gretatuckute/drive_suppress_brains/blob/main/src/run_analyses/use_mapping_external.py) loads the regression weights from the encoding model and predicts each sentence in the supplied stimulus set.
 - The `src/statistics` folder contains R code to run LME models.
 
-<!---
+
 ## Citation
 If you use this repository or data, please cite:
 
 ```
-@article{Tuckute2023.04.16.537080,
-	abstract = {Transformer language models are today{\textquoteright}s most accurate models of language processing in the brain. Here, using fMRI-measured brain responses to 1,000 diverse sentences, we develop a GPT-based encoding model and use this model to identify new sentences that are predicted to drive or suppress responses in the human language network. We demonstrate that these model-selected {\textquoteleft}out-of-distribution{\textquoteright} sentences indeed drive and suppress activity of human language areas in new individuals (86\% increase and 98\% decrease relative to the average response to diverse naturalistic sentences). A systematic analysis of the model-selected sentences reveals that surprisal and well-formedness of linguistic input are key determinants of response strength in the language network. These results establish the ability of brain-aligned models to noninvasively control neural activity in higher-level cortical areas, like the language network.Competing Interest StatementThe authors have declared no competing interest.},
-	author = {Greta Tuckute and Aalok Sathe and Shashank Srikant and Maya Taliaferro and Mingye Wang and Martin Schrimpf and Kendrick Kay and Evelina Fedorenko},
-	doi = {10.1101/2023.04.16.537080},
-	elocation-id = {2023.04.16.537080},
-	eprint = {https://www.biorxiv.org/content/early/2023/05/06/2023.04.16.537080.full.pdf},
-	journal = {bioRxiv},
-	publisher = {Cold Spring Harbor Laboratory},
-	title = {Driving and suppressing the human language network using large language models},
-	url = {https://www.biorxiv.org/content/early/2023/05/06/2023.04.16.537080},
-	year = {2023},
-	bdsk-url-1 = {https://www.biorxiv.org/content/early/2023/05/06/2023.04.16.537080},
-	bdsk-url-2 = {https://doi.org/10.1101/2023.04.16.537080}}
+@article{Tuckute2024,
+  title = {Driving and suppressing the human language network using large language models},
+  author = {Tuckute, Greta and Sathe, Aalok and Srikant, Shashank and Taliaferro, Maya and Wang, Mingye and Schrimpf, Martin and Kay, Kendrick and Fedorenko, Evelina},
+  journal = {Nature Human Behaviour},
+  year = {2024},
+  date = {2024/01/03},
+  abstract = {Transformer models such as GPT generate human-like language and are predictive of human brain responses to language. Here, using functional-MRI-measured brain responses to 1,000 diverse sentences, we first show that a GPT-based encoding model can predict the magnitude of the brain response associated with each sentence. We then use the model to identify new sentences that are predicted to drive or suppress responses in the human language network. We show that these model-selected novel sentences indeed strongly drive and suppress the activity of human language areas in new individuals. A systematic analysis of the model-selected sentences reveals that surprisal and well-formedness of linguistic input are key determinants of response strength in the language network. These results establish the ability of neural network models to not only mimic human language but also non-invasively control neural activity in higher-level cortical areas, such as the language network.},
+  doi = {10.1038/s41562-023-01783-7},
+  url = {https://doi.org/10.1038/s41562-023-01783-7},
+  issn = {2397-3374}
+}
 ```
---->
-
-<!---
-
-## XXXXX
-We used to common model-brain evaluation metrics, namely regression and representational similarity analysis (RSA), as demonstrated in the figure below.
-
-<img src="./illustrations/fig1.png" width="600"/>
-
-### Regression
-
-
-#### Note on how DNN unit activations are organized
-
-## Generating plots
-The figures in the paper can be reproduced via the notebooks in the [analyze](https://github.com/gretatuckute/auditory_brain_dnn/tree/main/aud_dnn/analyze) directory, e.g., [generate_Figure2.ipynb](https://github.com/gretatuckute/auditory_brain_dnn/blob/main/aud_dnn/analyze/generate_Figure2.ipynb) and so forth.
-
-
-`.
-├── data
-├── env
-├── model-actv
-│    └── gpt2-xl
-│          └── last-tok
-├── regr-weights
-│    └── fit_mapping
-│          └── last-tok
-├── results
-├── src
-│   ├── plot_data
-│   ├── run_analyses
-│   └── statistics
-└── README.md
-`
-
-
---->
