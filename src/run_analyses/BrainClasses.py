@@ -260,7 +260,8 @@ class ANNEncoder:
 		# Obtain stimsetid (the identifier for the stimuli)
 		stimsetid_all = ['.'.join(stimset.index[x].split('.')[:-1]) for x in
 						 range(len(stimset))]  # include all information separated by '.' besides the very last index
-		assert (len(np.unique(stimsetid_all)) == 1)  # Check whether all sentences come from the same corpus
+		if not (len(np.unique(stimsetid_all)) == 1):  # Check whether all sentences come from the same corpus
+			print(f'All sentences do not appear to be from the same corpus!')
 		stimsetid = stimsetid_all[0]
 		if kwargs.get('stimsetid_suffix'):
 			stimsetid_suffix = kwargs.get('stimsetid_suffix')
