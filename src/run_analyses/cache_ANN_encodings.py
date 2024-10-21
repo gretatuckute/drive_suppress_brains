@@ -13,7 +13,9 @@ def main(raw_args=None):
     # ANN (source) specific
     parser.add_argument('--input_file', type=str, help='Path to input file')
     parser.add_argument('--source_model', default='gpt2-xl', type=str, help='Pretrained model name')
-    parser.add_argument('--sent_embed', default='last-tok', type=str, help='How to obtain sentence embeddings')
+    parser.add_argument('--sent_embed', default='last-tok', type=str, help='How to obtain sentence embeddings.
+                                        Options are "last-tok", "first-tok", "mean-tok", "median-tok", "sum-tok", or "all-tok".
+                                        See _aggregate_layers function in BrainClasses.py')
     parser.add_argument('--actv_cache_setting', default='auto', type=str, help='Which cache setting to use')
     parser.add_argument('--actv_cache_path', 
                         default='/nese/mit/group/evlab/u/asathe/beta-control-neural', 
@@ -23,7 +25,7 @@ def main(raw_args=None):
 
     args = parser.parse_args(raw_args)
 
-
+    # The input is a Pandas dataframe, with a column denoted as "sentence".
     df = pd.read_csv(args.input_file, index_col=[0])
 
     ####### ANN ENCODER ########
