@@ -2,13 +2,13 @@
 
 This repository contains code and data accompanying: 
 
-Tuckute, G., Sathe, A., Srikant, S., Taliaferro, M., Wang, M., Schrimpf, M., Kay, K., Fedorenko, E.: _Driving and suppressing the human language network using large language models_. Nat Hum Behav (2024). https://doi.org/10.1038/s41562-023-01783-7
+Tuckute, G., Sathe, A., Srikant, S., Taliaferro, M., Wang, M., Schrimpf, M., Kay, K., Fedorenko, E.: _Driving and suppressing the human language network using large language models_. Nature Human Behavior (2024). https://doi.org/10.1038/s41562-023-01783-7
 
 ## Environment
 The environment is a Python 3.8.11 environment that makes heavy use of [pandas](https://pandas.pydata.org/), [scikit-learn](https://scikit-learn.org/stable/), [HuggingFace Transformers](https://huggingface.co/docs/transformers/index), and [matplotlib](https://matplotlib.org/). To use the exact Python environment used in the paper, install it as:
 
 ```
-conda env create -f env_drive-suppress-brains.yml
+conda env create -f env/env_drive-suppress-brains.yml
 ```
 
 ## Repository organization
